@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cupcakes</title>
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Pixelify Sans', sans-serif;
+      text-align: center;
+      background: #fffbe7;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+      touch-action: none;
+    }
+
+    .game-area {
+      position: relative;
+      width: 90vw;
+      max-width: 400px;
+      height: 445px;
+      margin: 20px auto;
+      background-color: #fffbe7;
+      padding: 1cm;
+      box-sizing: border-box;
+      border: 2px dashed #ccc;
+      overflow: hidden;
+    }
+
+    @keyframes float {
+      0%   { transform: translateY(0px); }
+      50%  { transform: translateY(-10px); }
+      100% { transform: translateY(0px); }
+    }
+
+    .cupcake {
+      width: 130px;
+      position: absolute;
+      top: 50px;
+      cursor: grab;
+      z-index: 2;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    .box {
+      width: 250px;
+      position: absolute;
+      bottom: 12px;
+      left: 67px;
+      z-index: 1;
+    }
+
+    .chatbox {
+      position: absolute;
+      width: 90px;
+      bottom: 170px;
+      left: 237px;
+      z-index: 3;
+      transition: opacity 0.3s ease;
+    }
+
+    .chatbox2 {
+      position: absolute;
+      width: 60px;
+      bottom: 200px;
+      left: 167px;
+      z-index: 3;
+      transition: opacity 0.3s ease;
+      opacity: 0;
+    }
+
+    #resetBtn {
+      display: none;
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 2px 12px;
+      font-family: 'Pixelify Sans', sans-serif;
+      background-color: #ffc0cb;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      z-index: 5;
+    }
+  </style>
+</head>
+<body>
+  <h1>⋆｡·°ʚ🍓ɞ°‧｡⋆</h1>
+
+  <div class="game-area">
+    <img src="box1.png" id="box" class="box" />
+    <img src="chatbox.png" id="chatbox" class="chatbox" />
+    <img src="chatbox2.png" id="chatbox2" class="chatbox2" />
+    <img src="cup.png" class="cupcake" draggable="true" style="left: 20px;" />
+    <img src="cup1.png" class="cupcake" draggable="true" style="left: 140px;" />
+    <img src="cup2.png" class="cupcake" draggable="true" style="left: 260px;" />
+
+    <button id="resetBtn">Reset Game</button>
+  </div>
+
+  <audio id="dropSound" src="drop.mp3" preload="auto"></audio>
+  <audio id="winSound" src="win.mp3" preload="auto"></audio>
+
+  <script>
+    const cupcakes = document.querySelectorAll('.cupcake');
+    const box = document.getElementById('box');
+    const chatbox = document.getElementById('chatbox');
+    const chatbox2 = document.getElementById('chatbox2');
+    const resetBtn = document.getElementById('resetBtn');
+    const gameArea = document.querySelector('.game-area');
+    const dropSound = document.getElementById('dropSound');
+    const winSound = document.getElementById('winSound');
+
+    let dragged = null;
+    let offsetX = 0;
+    let offsetY = 0;
+    let droppedCount = 0;
+
+    function playDropSound() {
+      const s = dropSound.cloneNode();
+      s.play().catch(() => {});
+    }
+
+    function unlockAudio() {
+      [dropSound, winSound].forEach(sound => {
+        const s = sound.cloneNode();
+        s.play().then(() => s.pause()).catch(() => {});
+      });
+      document.removeEventListener('touchstart', unlockAudio);
+      document.removeEventListener('click', unlockAudio);
+    }
+
+    document.addEventListener('touchstart', unlockAudio, { once: true });
+    document.addEventListener('click', unlockAudio, { once: true });
+
+    const initialPositions = [];
+    cupcakes.forEach((cupcake, i) => {
+      initialPositions[i] = { left: cupcake.offsetLeft, top: cupcake.offsetTop };
+      cupcake.addEventListener('mousedown', startDrag);
+      cupcake.addEventListener('touchstart', startDrag, { passive: false });
+    });
+
+    document.addEventListener('mousemove', onDrag);
+    document.addEventListener('touchmove', onDrag, { passive: false });
+
+    document.addEventListener('mouseup', endDrag);
+    document.addEventListener('touchend', endDrag);
+
+    function startDrag(e) {
+      e.preventDefault();
+      dragged = e.target.closest('.cupcake');
+      if (!dragged) return;
+
+      const gameAreaRect = gameArea.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+      offsetX = clientX - dragged.offsetLeft - gameAreaRect.left;
+      offsetY = clientY - dragged.offsetTop - gameAreaRect.top;
+
+      if (chatbox) chatbox.style.opacity = 0;
+
+      dragged.style.cursor = 'grabbing';
+      dragged.style.position = 'absolute';
+      dragged.style.zIndex = 10;
+    }
+
+    function onDrag(e) {
+      if (!dragged) return;
+      e.preventDefault();
+
+      const gameAreaRect = gameArea.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+      let left = clientX - gameAreaRect.left - offsetX;
+      let top = clientY - gameAreaRect.top - offsetY;
+
+      left = Math.max(0, Math.min(left, gameArea.clientWidth - dragged.clientWidth));
+      top = Math.max(0, Math.min(top, gameArea.clientHeight - dragged.clientHeight));
+
+      dragged.style.left = `${left}px`;
+      dragged.style.top = `${top}px`;
+    }
+
+    function endDrag(e) {
+      if (!dragged) return;
+
+      const boxRect = box.getBoundingClientRect();
+      const draggedRect = dragged.getBoundingClientRect();
+
+      if (
+        draggedRect.left < boxRect.right &&
+        draggedRect.right > boxRect.left &&
+        draggedRect.top < boxRect.bottom &&
+        draggedRect.bottom > boxRect.top
+      ) {
+        if (!dragged.classList.contains('dropped')) {
+          dragged.classList.add('dropped');
+          droppedCount++;
+          playDropSound();
+        }
+
+        const offsetLeft = draggedRect.left - boxRect.left;
+        const offsetTop = draggedRect.top - boxRect.top;
+
+        box.appendChild(dragged);
+        dragged.style.left = `${offsetLeft}px`;
+        dragged.style.top = `${offsetTop}px`;
+        dragged.style.cursor = 'default';
+
+        if (droppedCount === cupcakes.length) {
+          chatbox2.style.opacity = 1;
+          resetBtn.style.display = 'block';
+
+          winSound.currentTime = 0;
+          winSound.play().catch(() => {});
+        }
+      } else {
+        const idx = Array.from(cupcakes).indexOf(dragged);
+        if (idx !== -1) {
+          dragged.style.left = initialPositions[idx].left + 'px';
+          dragged.style.top = initialPositions[idx].top + 'px';
+        }
+      }
+
+      dragged.style.zIndex = 2;
+      dragged = null;
+    }
+
+    resetBtn.addEventListener('click', () => {
+      cupcakes.forEach((cupcake, i) => {
+        gameArea.appendChild(cupcake);
+        cupcake.style.left = initialPositions[i].left + 'px';
+        cupcake.style.top = initialPositions[i].top + 'px';
+        cupcake.style.cursor = 'grab';
+        cupcake.classList.remove('dropped');
+      });
+
+      droppedCount = 0;
+      chatbox.style.opacity = 1;
+      chatbox2.style.opacity = 0;
+      resetBtn.style.display = 'none';
+    });
+  </script>
+</body>
+</html>
